@@ -92,6 +92,8 @@ __global__ void Compute_SSSP_kernel(int dnum, int * gpu_offset_array ,
   cudaMalloc(&gpu_offset_array[i],sizeof(int) *(1+V));
   }
 
+	std::cout << "Done" << "\n";
+
   int * gpu_edge_list[devicecount];
   for(int i=0;i<devicecount;i++)
   {
@@ -106,19 +108,33 @@ __global__ void Compute_SSSP_kernel(int dnum, int * gpu_offset_array ,
   cudaMalloc(&gpu_edge_weight[i],sizeof(int) *(E));
   }
 
+	std::cout << "Done" << "\n";
+
   // RESUT VAR
-  int * gpu_dist[devicecount];
-  int dist[devicecount][V];
+  int *gpu_dist[devicecount];
   
+  //int dist[devicecount][V];
+  int **dist;
+  dist = new int*[devicecount];
+  for(int i=0; i<devicecount; i++)
+    dist[i] = new int[V];
+
   for(int i=0;i<devicecount;i++)
   {
   cudaSetDevice(i);
   cudaMalloc(&gpu_dist[i],sizeof(int) *(V));
   }
+	std::cout << "Done" << "\n";
 
   // EXTRA VARS
-  bool cpu_modified_prev[devicecount][V];
-  bool * gpu_modified_prev[devicecount];
+
+  //bool cpu_modified_prev[devicecount][V];
+  bool **cpu_modified_prev;
+  cpu_modified_prev = new bool*[devicecount];
+  for(int i=0; i<devicecount; i++)
+    cpu_modified_prev[i] = new bool[V];
+
+  bool *gpu_modified_prev[devicecount];
   for(int i=0;i<devicecount;i++)
   {
   cudaSetDevice(i);
@@ -232,7 +248,8 @@ __global__ void Compute_SSSP_kernel(int dnum, int * gpu_offset_array ,
 	//cudaSetDevice(0);
 	Compute_SSSP_kernel<<<num_blocks , block_size>>>(i, gpu_offset_array[i], gpu_edge_list[i],  gpu_edge_weight[i] ,gpu_dist[i] ,V , gpu_modified_prev[i], gpu_modified_next[i], gpu_finished[i], perdevicevertices, devicecount );
     }
-	
+	// No explicit CDS required for each device here as there are cudaMemcopies happening on each device later
+
 	printf("Hellooo\n");
     for(int i=0;i<devicecount;i++)
     {
@@ -251,7 +268,7 @@ __global__ void Compute_SSSP_kernel(int dnum, int * gpu_offset_array ,
     {
 	printf("%d ", i);
         cudaSetDevice(i);
-    	cudaMemcpy(currvalue, gpu_finished[i],  sizeof(bool) *(1), cudaMemcpyDeviceToHost);		// Problem : finished should be a 1-D array
+    	cudaMemcpy(currvalue, gpu_finished[i],  sizeof(bool) *(1), cudaMemcpyDeviceToHost);	
     	cpuarr_finished[i] = *currvalue;
     }
 
@@ -352,13 +369,13 @@ __global__ void Compute_SSSP_kernel(int dnum, int * gpu_offset_array ,
   // PRINT THE OUTPUT vars
   if(printAns) 
   {
-    for(int i=0;i<devicecount;i++)
+    for(int i=0;i<1;i++)
     {
         cudaSetDevice(i);
     	cudaMemcpy(dist[i],gpu_dist[i] , sizeof(int) * (V), cudaMemcpyDeviceToHost);
     }
 
-    for( int j=0;j<devicecount; j++ )
+    for( int j=0;j<1; j++ )
     	for (int i = 0; i <V; i++) 
 	{
       		printf("%d %d\n", i, dist[j][i]);
